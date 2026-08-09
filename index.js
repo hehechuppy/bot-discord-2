@@ -1,4 +1,5 @@
 require('dotenv').config();
+const http = require('http');
 const { 
     Client, 
     GatewayIntentBits, 
@@ -260,7 +261,6 @@ client.on('interactionCreate', async interaction => {
     }
 
     if (interaction.commandName === 'mute') {
-        // Đã sửa lỗi lặp điều kiện quyền
         if (!hasRole && !isAdmin) {
             return interaction.reply({ content: '🚫 Bạn không có quyền sử dụng lệnh này!', ephemeral: true });
         }
@@ -316,5 +316,10 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({ embeds: [embed], components: [row] });
     }
 });
+
+http.createServer((req, res) => {
+    if (req.url === '/health') return res.end('OK');
+    res.end('BOT ONLINE');
+}).listen(process.env.PORT || 10000);
 
 client.login(process.env.DISCORD_TOKEN);
