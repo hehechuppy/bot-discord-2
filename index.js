@@ -66,7 +66,7 @@ const commands = [
         .setDescription('Cho bot rời khỏi kênh voice hiện tại')
 ].map(command => command.toJSON());
 
-// Sửa lại thành 'ready' thay vì 'clientReady'
+// Sự kiện sẵn sàng của bot
 client.once('ready', async () => {
     console.log(`Bot đã đăng nhập thành công dưới tên: ${client.user.tag}`);
 
@@ -237,6 +237,7 @@ client.on('interactionCreate', async interaction => {
 
     if (!interaction.isChatInputCommand()) return;
 
+    // Danh sách ID Role được phép sử dụng các lệnh quản trị / điều khiển bot
     const allowedRoleIds = [
         '1420260959913775155', 
         '1420753551587807353', 
@@ -246,11 +247,13 @@ client.on('interactionCreate', async interaction => {
     const hasRole = interaction.member.roles.cache.some(role => allowedRoleIds.includes(role.id));
     const isAdmin = interaction.member.permissions.has('Administrator');
 
+    // Lệnh /say
     if (interaction.commandName === 'say') {
         const noiDung = interaction.options.getString('noidung');
         await interaction.reply({ content: `Bạn vừa bắt bot nói: **${noiDung}**` });
     }
 
+    // Lệnh /clear
     if (interaction.commandName === 'clear') {
         if (!hasRole && !isAdmin) {
             return interaction.reply({ content: '🚫 Bạn không có quyền sử dụng lệnh này!', ephemeral: true });
@@ -268,6 +271,7 @@ client.on('interactionCreate', async interaction => {
         }
     }
 
+    // Lệnh /mute
     if (interaction.commandName === 'mute') {
         if (!hasRole && !isAdmin) {
             return interaction.reply({ content: '🚫 Bạn không có quyền sử dụng lệnh này!', ephemeral: true });
@@ -287,6 +291,7 @@ client.on('interactionCreate', async interaction => {
         }
     }
 
+    // Lệnh /menu
     if (interaction.commandName === 'menu') {
         if (!hasRole && !isAdmin) {
             return interaction.reply({ content: '🚫 Bạn không có quyền hiển thị Menu này!', ephemeral: true });
@@ -324,8 +329,13 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({ embeds: [embed], components: [row] });
     }
 
-    // --- LỆNH /join: bot vào kênh voice của người gọi lệnh và ở lại đó ---
+    // --- LỆNH /join: Cho bot vào kênh voice ---
     if (interaction.commandName === 'join') {
+        // Kiểm tra quyền role / admin
+        if (!hasRole && !isAdmin) {
+            return interaction.reply({ content: '🚫 Bạn không có quyền sử dụng lệnh này!', ephemeral: true });
+        }
+
         const memberVoiceChannel = interaction.member.voice.channel;
         if (!memberVoiceChannel) {
             return interaction.reply({ content: '❌ Bạn cần đang ở trong 1 kênh voice để dùng lệnh này!', ephemeral: true });
@@ -345,8 +355,13 @@ client.on('interactionCreate', async interaction => {
         }
     }
 
-    // --- LỆNH /leave: bot rời khỏi kênh voice hiện tại ---
+    // --- LỆNH /leave: Cho bot rời kênh voice ---
     if (interaction.commandName === 'leave') {
+        // Kiểm tra quyền role / admin
+        if (!hasRole && !isAdmin) {
+            return interaction.reply({ content: '🚫 Bạn không có quyền sử dụng lệnh này!', ephemeral: true });
+        }
+
         const connection = getVoiceConnection(interaction.guildId);
         if (!connection) {
             return interaction.reply({ content: '❌ Bot hiện không ở trong kênh voice nào!', ephemeral: true });
@@ -356,6 +371,7 @@ client.on('interactionCreate', async interaction => {
     }
 });
 
+// Tạọ HTTP Server phục vụ Uptime Keep-Alive trên Render
 http.createServer((req, res) => {
     if (req.url === '/health') return res.end('OK');
     res.end('BOT ONLINE');
