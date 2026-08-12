@@ -359,6 +359,9 @@ client.on('interactionCreate', async interaction => {
 http.createServer((req, res) => {
     if (req.url === '/health') return res.end('OK');
     res.end('BOT ONLINE');
+    http.createServer((req, res) => {
+    if (req.url === '/health') return res.end('OK');
+    res.end('BOT ONLINE');
 }).listen(process.env.PORT || 10000);
 
 client.login(process.env.DISCORD_TOKEN);
