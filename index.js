@@ -10,7 +10,6 @@ const {
     StringSelectMenuBuilder, 
     EmbedBuilder 
 } = require('discord.js');
-const { joinVoiceChannel, getVoiceConnection } = require('@discordjs/voice');
 
 const client = new Client({
     intents: [
@@ -18,7 +17,6 @@ const client = new Client({
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMembers, // Bắt buộc bật để bot thay đổi được nickname
-        GatewayIntentBits.GuildVoiceStates, // Bắt buộc bật để bot vào/xử lý kênh voice
     ],
 });
 
@@ -57,13 +55,7 @@ const commands = [
                 .setDescription('Lý do mute')),
     new SlashCommandBuilder()
         .setName('menu')
-        .setDescription('Hiển thị bảng chọn Script Hub'),
-    new SlashCommandBuilder()
-        .setName('join')
-        .setDescription('Cho bot vào kênh voice bạn đang ở và ở lại đó'),
-    new SlashCommandBuilder()
-        .setName('leave')
-        .setDescription('Cho bot rời khỏi kênh voice hiện tại')
+        .setDescription('Hiển thị bảng chọn Script Hub')
 ].map(command => command.toJSON());
 
 // Sửa lại thành 'ready' thay vì 'clientReady'
@@ -323,45 +315,11 @@ client.on('interactionCreate', async interaction => {
 
         await interaction.reply({ embeds: [embed], components: [row] });
     }
-
-    // --- LỆNH /join: bot vào kênh voice của người gọi lệnh và ở lại đó ---
-    if (interaction.commandName === 'join') {
-        const memberVoiceChannel = interaction.member.voice.channel;
-        if (!memberVoiceChannel) {
-            return interaction.reply({ content: '❌ Bạn cần đang ở trong 1 kênh voice để dùng lệnh này!', ephemeral: true });
-        }
-
-        try {
-            joinVoiceChannel({
-                channelId: memberVoiceChannel.id,
-                guildId: memberVoiceChannel.guild.id,
-                adapterCreator: memberVoiceChannel.guild.voiceAdapterCreator,
-                selfDeaf: false
-            });
-            return interaction.reply({ content: `✅ Đã vào kênh voice **${memberVoiceChannel.name}**!` });
-        } catch (error) {
-            console.error(error);
-            return interaction.reply({ content: '❌ Không thể vào kênh voice, kiểm tra lại quyền của bot!', ephemeral: true });
-        }
-    }
-
-    // --- LỆNH /leave: bot rời khỏi kênh voice hiện tại ---
-    if (interaction.commandName === 'leave') {
-        const connection = getVoiceConnection(interaction.guildId);
-        if (!connection) {
-            return interaction.reply({ content: '❌ Bot hiện không ở trong kênh voice nào!', ephemeral: true });
-        }
-        connection.destroy();
-        return interaction.reply({ content: '👋 Đã rời khỏi kênh voice!' });
-    }
 });
 
 http.createServer((req, res) => {
     if (req.url === '/health') return res.end('OK');
     res.end('BOT ONLINE');
-    http.createServer((req, res) => {
-    if (req.url === '/health') return res.end('OK');
-    res.end('BOT ONLINE');
 }).listen(process.env.PORT || 10000);
-    
+
 client.login(process.env.DISCORD_TOKEN);
