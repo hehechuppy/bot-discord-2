@@ -10,8 +10,7 @@ const {
     StringSelectMenuBuilder, 
     EmbedBuilder 
 } = require('discord.js');
-const { joinVoiceChannel, getVoiceConnection, createAudioPlayer, createAudioResource, AudioPlayerStatus } = require('@discordjs/voice');
-const playdl = require('play-dl');
+const { joinVoiceChannel, getVoiceConnection } = require('@discordjs/voice');
 
 const client = new Client({
     intents: [
@@ -25,64 +24,6 @@ const client = new Client({
 
 // Map lưu trữ thông tin AFK: { reason, oldName }
 const afkMap = new Map();
-
-// ================= HỆ THỐNG PHÁT NHẠC =================
-// guildId -> { player, queue: [{url,title,requestedBy}], textChannel, nowPlaying }
-const musicStates = new Map();
-
-function getMusicState(guildId) {
-    let state = musicStates.get(guildId);
-    if (!state) {
-        const player = createAudioPlayer();
-        state = { player, queue: [], textChannel: null, nowPlaying: null };
-
-        player.on(AudioPlayerStatus.Idle, () => {
-            state.nowPlaying = null;
-            playNextInQueue(guildId);
-        });
-
-        player.on('error', (err) => {
-            console.error('❌ Lỗi audio player:', err);
-            if (state.textChannel) state.textChannel.send('❌ Có lỗi khi phát nhạc, đang chuyển bài tiếp theo...').catch(() => {});
-            state.nowPlaying = null;
-            playNextInQueue(guildId);
-        });
-
-        musicStates.set(guildId, state);
-    }
-    return state;
-}
-
-async function resolveTrack(query) {
-    const type = playdl.yt_validate(query);
-    if (type === 'video') {
-        const info = await playdl.video_basic_info(query);
-        return { url: query, title: info.video_details.title };
-    }
-    const results = await playdl.search(query, { limit: 1, source: { youtube: 'video' } });
-    if (!results || results.length === 0) return null;
-    return { url: results[0].url, title: results[0].title };
-}
-
-async function playNextInQueue(guildId) {
-    const state = musicStates.get(guildId);
-    if (!state || state.queue.length === 0) return;
-
-    const track = state.queue.shift();
-    try {
-        const streamInfo = await playdl.stream(track.url);
-        const resource = createAudioResource(streamInfo.stream, { inputType: streamInfo.type });
-        state.player.play(resource);
-        state.nowPlaying = track;
-        if (state.textChannel) {
-            state.textChannel.send(`🎶 Đang phát: **${track.title}**`).catch(() => {});
-        }
-    } catch (e) {
-        console.error('❌ Lỗi khi lấy stream:', e);
-        if (state.textChannel) state.textChannel.send(`❌ Không thể phát **${track.title}**, bỏ qua bài này.`).catch(() => {});
-        playNextInQueue(guildId);
-    }
-}
 
 // 1. Định nghĩa cấu trúc danh sách lệnh gạch chéo
 const commands = [
@@ -122,23 +63,7 @@ const commands = [
         .setDescription('Cho bot vào kênh voice bạn đang ở và ở lại đó'),
     new SlashCommandBuilder()
         .setName('leave')
-        .setDescription('Cho bot rời khỏi kênh voice hiện tại'),
-    new SlashCommandBuilder()
-        .setName('play')
-        .setDescription('Phát nhạc từ YouTube (dán link hoặc gõ tên bài để tìm kiếm)')
-        .addStringOption(option =>
-            option.setName('noidung')
-                .setDescription('Link YouTube hoặc tên bài hát')
-                .setRequired(true)),
-    new SlashCommandBuilder()
-        .setName('skip')
-        .setDescription('Bỏ qua bài đang phát'),
-    new SlashCommandBuilder()
-        .setName('stop')
-        .setDescription('Dừng phát nhạc, xóa hàng chờ và rời kênh voice'),
-    new SlashCommandBuilder()
-        .setName('queue')
-        .setDescription('Xem danh sách hàng chờ nhạc')
+        .setDescription('Cho bot rời khỏi kênh voice hiện tại')
 ].map(command => command.toJSON());
 
 // Sửa lại thành 'ready' thay vì 'clientReady'
@@ -407,14 +332,12 @@ client.on('interactionCreate', async interaction => {
         }
 
         try {
-            const connection = joinVoiceChannel({
+            joinVoiceChannel({
                 channelId: memberVoiceChannel.id,
                 guildId: memberVoiceChannel.guild.id,
                 adapterCreator: memberVoiceChannel.guild.voiceAdapterCreator,
                 selfDeaf: false
             });
-            const state = getMusicState(interaction.guildId);
-            connection.subscribe(state.player);
             return interaction.reply({ content: `✅ Đã vào kênh voice **${memberVoiceChannel.name}**!` });
         } catch (error) {
             console.error(error);
@@ -428,100 +351,8 @@ client.on('interactionCreate', async interaction => {
         if (!connection) {
             return interaction.reply({ content: '❌ Bot hiện không ở trong kênh voice nào!', ephemeral: true });
         }
-        const state = musicStates.get(interaction.guildId);
-        if (state) {
-            state.queue = [];
-            state.nowPlaying = null;
-            state.player.stop();
-        }
         connection.destroy();
         return interaction.reply({ content: '👋 Đã rời khỏi kênh voice!' });
-    }
-
-    // --- LỆNH /play: phát nhạc từ YouTube (link hoặc tìm kiếm) ---
-    if (interaction.commandName === 'play') {
-        const memberVoiceChannel = interaction.member.voice.channel;
-        if (!memberVoiceChannel) {
-            return interaction.reply({ content: '❌ Bạn cần đang ở trong 1 kênh voice để dùng lệnh này!', ephemeral: true });
-        }
-
-        await interaction.deferReply();
-
-        const query = interaction.options.getString('noidung');
-        let track;
-        try {
-            track = await resolveTrack(query);
-        } catch (e) {
-            console.error(e);
-            return interaction.editReply('❌ Có lỗi khi tìm bài hát, thử lại sau.');
-        }
-        if (!track) {
-            return interaction.editReply('❌ Không tìm thấy bài hát nào khớp với yêu cầu của bạn!');
-        }
-        track.requestedBy = interaction.user.username;
-
-        const state = getMusicState(interaction.guildId);
-        state.textChannel = interaction.channel;
-
-        let connection = getVoiceConnection(interaction.guildId);
-        if (!connection) {
-            connection = joinVoiceChannel({
-                channelId: memberVoiceChannel.id,
-                guildId: interaction.guildId,
-                adapterCreator: memberVoiceChannel.guild.voiceAdapterCreator,
-                selfDeaf: false
-            });
-        }
-        connection.subscribe(state.player);
-
-        state.queue.push(track);
-
-        if (!state.nowPlaying && state.player.state.status === AudioPlayerStatus.Idle) {
-            playNextInQueue(interaction.guildId);
-            return interaction.editReply(`🎶 Đang phát ngay: **${track.title}**`);
-        } else {
-            return interaction.editReply(`✅ Đã thêm vào hàng chờ: **${track.title}** (vị trí #${state.queue.length})`);
-        }
-    }
-
-    // --- LỆNH /skip: bỏ qua bài đang phát ---
-    if (interaction.commandName === 'skip') {
-        const state = musicStates.get(interaction.guildId);
-        if (!state || !state.nowPlaying) {
-            return interaction.reply({ content: '❌ Hiện không có bài nào đang phát!', ephemeral: true });
-        }
-        state.player.stop(); // sẽ tự kích hoạt AudioPlayerStatus.Idle -> phát bài tiếp theo
-        return interaction.reply('⏭️ Đã bỏ qua bài hát.');
-    }
-
-    // --- LỆNH /stop: dừng phát nhạc, xóa hàng chờ, rời voice ---
-    if (interaction.commandName === 'stop') {
-        const state = musicStates.get(interaction.guildId);
-        if (state) {
-            state.queue = [];
-            state.nowPlaying = null;
-            state.player.stop();
-        }
-        const connection = getVoiceConnection(interaction.guildId);
-        if (connection) connection.destroy();
-        return interaction.reply('⏹️ Đã dừng phát nhạc và rời kênh voice.');
-    }
-
-    // --- LỆNH /queue: xem hàng chờ nhạc ---
-    if (interaction.commandName === 'queue') {
-        const state = musicStates.get(interaction.guildId);
-        if (!state || (!state.nowPlaying && state.queue.length === 0)) {
-            return interaction.reply({ content: '📭 Hàng chờ nhạc đang trống!', ephemeral: true });
-        }
-        let desc = '';
-        if (state.nowPlaying) desc += `▶️ **Đang phát:** ${state.nowPlaying.title}\n\n`;
-        if (state.queue.length > 0) {
-            desc += state.queue.map((t, i) => `${i + 1}. ${t.title}`).join('\n');
-        } else {
-            desc += '_Hàng chờ trống._';
-        }
-        const embed = new EmbedBuilder().setColor('#7289DA').setTitle('🎵 HÀNG CHỜ NHẠC').setDescription(desc);
-        return interaction.reply({ embeds: [embed] });
     }
 });
 
