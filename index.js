@@ -25,6 +25,23 @@ const client = new Client({
 
 const afkMap = new Map();
 
+// Hàm hỗ trợ chuyển đổi chuỗi thời gian (ví dụ: 10p, 2h, 1d) sang miligiây
+function parseTimeToMs(timeStr) {
+    if (!timeStr) return null;
+    const match = timeStr.trim().match(/^(\d+)\s*([phdPHD])$/);
+    if (!match) return null;
+
+    const value = parseInt(match[1]);
+    const unit = match[2].toLowerCase();
+
+    switch (unit) {
+        case 'p': return value * 60 * 1000;          // Phút
+        case 'h': return value * 60 * 60 * 1000;     // Giờ
+        case 'd': return value * 24 * 60 * 60 * 1000; // Ngày
+        default: return null;
+    }
+}
+
 // 1. Định nghĩa cấu trúc danh sách lệnh gạch chéo
 const commands = [
     new SlashCommandBuilder()
@@ -62,6 +79,9 @@ const commands = [
             option.setName('target')
                 .setDescription('Người muốn cấm chat')
                 .setRequired(true))
+        .addStringOption(option =>
+            option.setName('thoigian')
+                .setDescription('Thời gian cấm (VD: 10p, 2h, 1d). Bỏ trống = cấm vĩnh viễn'))
         .addChannelOption(option =>
             option.setName('kenh')
                 .setDescription('Kênh muốn cấm (để trống nếu muốn cấm ở kênh hiện tại)'))
@@ -261,7 +281,6 @@ client.on('interactionCreate', async interaction => {
         '1420262154271199283'
     ];
 
-    // Chỉ kiểm tra xem người dùng có Role nằm trong allowedRoleIds hay không
     const hasRole = interaction.member.roles.cache.some(role => allowedRoleIds.includes(role.id));
 
     if (interaction.commandName === 'say') {
@@ -305,13 +324,14 @@ client.on('interactionCreate', async interaction => {
         }
     }
 
-    // --- LỆNH /camchat: CHỈ DÀNH CHO ROLE QUY ĐỊNH ---
+    // --- LỆNH /camchat: BỔ SUNG THỜI GIAN ---
     if (interaction.commandName === 'camchat') {
         if (!hasRole) {
             return interaction.reply({ content: '🚫 Bạn không có Role được phép sử dụng lệnh này!', ephemeral: true });
         }
 
         const targetMember = interaction.options.getMember('target');
+        const timeInput = interaction.options.getString('thoigian');
         const targetChannel = interaction.options.getChannel('kenh') || interaction.channel;
         const reason = interaction.options.getString('lydo') || 'Không có lý do';
 
@@ -319,24 +339,52 @@ client.on('interactionCreate', async interaction => {
             return interaction.reply({ content: '❌ Không tìm thấy người dùng này trong Server!', ephemeral: true });
         }
 
+        let durationMs = null;
+        if (timeInput) {
+            durationMs = parseTimeToMs(timeInput);
+            if (!durationMs) {
+                return interaction.reply({ 
+                    content: '❌ Định dạng thời gian không hợp lệ! Vui lòng dùng: **p** (phút), **h** (giờ), **d** (ngày). VD: `10p`, `2h`, `1d`.', 
+                    ephemeral: true 
+                });
+            }
+        }
+
         try {
+            // Cấm chat
             await targetChannel.permissionOverwrites.edit(targetMember, {
                 SendMessages: false
             }, { reason });
 
-            return interaction.reply({
-                content: `🚫 Đã cấm **${targetMember.user.tag}** nhắn tin tại kênh ${targetChannel}!\n📝 **Lý do:** ${reason}`
+            const timeDisplay = timeInput ? `trong **${timeInput}**` : '**vĩnh viễn**';
+            await interaction.reply({
+                content: `🚫 Đã cấm **${targetMember.user.tag}** nhắn tin tại kênh ${targetChannel} ${timeDisplay}!\n📝 **Lý do:** ${reason}`
             });
+
+            // Nếu có đặt thời gian, lên lịch tự động uncamchat
+            if (durationMs) {
+                setTimeout(async () => {
+                    try {
+                        // Kiểm tra lại xem người dùng có còn bị cấm không trước khi gỡ
+                        await targetChannel.permissionOverwrites.edit(targetMember, {
+                            SendMessages: null
+                        });
+                        await targetChannel.send(`📢 **${targetMember.user.tag}** đã hết thời gian cấm chat và có thể nhắn tin lại!`);
+                    } catch (err) {
+                        console.error('Lỗi khi tự động gỡ cấm chat:', err);
+                    }
+                }, durationMs);
+            }
+
         } catch (error) {
             console.error(error);
             return interaction.reply({
-                content: '❌ Không thể cấm chat! Kiểm tra lại quyền của Bot (Bot cần quyền *Manage Channels* hoặc *Manage Roles*).',
+                content: '❌ Không thể cấm chat! Kiểm tra lại quyền của Bot (Bot cần quyền *Manage Channels*).',
                 ephemeral: true
             });
         }
     }
 
-    // --- LỆNH /uncamchat: CHỈ DÀNH CHO ROLE QUY ĐỊNH ---
     if (interaction.commandName === 'uncamchat') {
         if (!hasRole) {
             return interaction.reply({ content: '🚫 Bạn không có Role được phép sử dụng lệnh này!', ephemeral: true });
