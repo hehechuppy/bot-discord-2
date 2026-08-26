@@ -8,7 +8,8 @@ const {
     SlashCommandBuilder, 
     ActionRowBuilder, 
     StringSelectMenuBuilder, 
-    EmbedBuilder 
+    EmbedBuilder,
+    PermissionFlagsBits
 } = require('discord.js');
 const { joinVoiceChannel, getVoiceConnection } = require('@discordjs/voice');
 
@@ -17,12 +18,11 @@ const client = new Client({
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildMembers, // Bắt buộc bật để bot thay đổi được nickname
-        GatewayIntentBits.GuildVoiceStates, // Bắt buộc bật để bot vào/xử lý kênh voice
+        GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildVoiceStates,
     ],
 });
 
-// Map lưu trữ thông tin AFK: { reason, oldName }
 const afkMap = new Map();
 
 // 1. Định nghĩa cấu trúc danh sách lệnh gạch chéo
@@ -56,6 +56,29 @@ const commands = [
             option.setName('reason')
                 .setDescription('Lý do mute')),
     new SlashCommandBuilder()
+        .setName('camchat')
+        .setDescription('Cấm người dùng nhắn tin trong 1 kênh cụ thể')
+        .addUserOption(option =>
+            option.setName('target')
+                .setDescription('Người muốn cấm chat')
+                .setRequired(true))
+        .addChannelOption(option =>
+            option.setName('kenh')
+                .setDescription('Kênh muốn cấm (để trống nếu muốn cấm ở kênh hiện tại)'))
+        .addStringOption(option =>
+            option.setName('lydo')
+                .setDescription('Lý do cấm chat')),
+    new SlashCommandBuilder()
+        .setName('uncamchat')
+        .setDescription('Hủy cấm chat người dùng trong 1 kênh cụ thể')
+        .addUserOption(option =>
+            option.setName('target')
+                .setDescription('Người muốn gỡ cấm chat')
+                .setRequired(true))
+        .addChannelOption(option =>
+            option.setName('kenh')
+                .setDescription('Kênh muốn gỡ cấm (để trống nếu là kênh hiện tại)')),
+    new SlashCommandBuilder()
         .setName('menu')
         .setDescription('Hiển thị bảng chọn Script Hub'),
     new SlashCommandBuilder()
@@ -66,7 +89,6 @@ const commands = [
         .setDescription('Cho bot rời khỏi kênh voice hiện tại')
 ].map(command => command.toJSON());
 
-// Sửa lại thành 'ready' thay vì 'clientReady'
 client.once('ready', async () => {
     console.log(`Bot đã đăng nhập thành công dưới tên: ${client.user.tag}`);
 
@@ -90,12 +112,10 @@ client.on('messageCreate', async (message) => {
     const userId = message.author.id;
     const contentLower = message.content.toLowerCase();
 
-    // --- A. TỰ ĐỘNG BỎ AFK VÀ KHÔI PHỤC TÊN KHI CHAT LẠI ---
     if (afkMap.has(userId)) {
         const afkData = afkMap.get(userId);
         afkMap.delete(userId);
 
-        // Khôi phục lại tên ban đầu của người dùng trên server
         if (message.member) {
             await message.member.setNickname(afkData.oldName).catch(() => {});
         }
@@ -104,7 +124,6 @@ client.on('messageCreate', async (message) => {
         setTimeout(() => replyMsg.delete().catch(() => {}), 5000); 
     }
 
-    // --- B. BÁO LỖI KHI AI ĐÓ TAG NGƯỜI ĐANG AFK ---
     if (message.mentions.users.size > 0) {
         message.mentions.users.forEach(user => {
             if (afkMap.has(user.id)) {
@@ -114,7 +133,6 @@ client.on('messageCreate', async (message) => {
         });
     }
 
-    // --- C. XỬ LÝ LỆNH AFK (.afk hoặc ?afk) ---
     if (contentLower.startsWith('.afk') || contentLower.startsWith('?afk')) {
         const args = message.content.split(' ').slice(1);
         const reason = args.join(' ') || 'Không có lý do';
@@ -136,7 +154,6 @@ client.on('messageCreate', async (message) => {
         return message.reply(`💤 **${message.author.username}** đã bật AFK!\n📝 Lý do: **${reason}**`);
     }
 
-    // --- D. TỪ KHÓA CHAT THƯỜNG ---
     if (contentLower === 'ping') {
         message.reply('Pong! 🏓');
     }
@@ -237,14 +254,15 @@ client.on('interactionCreate', async interaction => {
 
     if (!interaction.isChatInputCommand()) return;
 
+    // Danh sách Role ID được phép dùng lệnh
     const allowedRoleIds = [
         '1420260959913775155', 
         '1420753551587807353', 
         '1420262154271199283'
     ];
 
+    // Chỉ kiểm tra xem người dùng có Role nằm trong allowedRoleIds hay không
     const hasRole = interaction.member.roles.cache.some(role => allowedRoleIds.includes(role.id));
-    const isAdmin = interaction.member.permissions.has('Administrator');
 
     if (interaction.commandName === 'say') {
         const noiDung = interaction.options.getString('noidung');
@@ -252,8 +270,8 @@ client.on('interactionCreate', async interaction => {
     }
 
     if (interaction.commandName === 'clear') {
-        if (!hasRole && !isAdmin) {
-            return interaction.reply({ content: '🚫 Bạn không có quyền sử dụng lệnh này!', ephemeral: true });
+        if (!hasRole) {
+            return interaction.reply({ content: '🚫 Bạn không có Role được phép sử dụng lệnh này!', ephemeral: true });
         }
         const count = interaction.options.getInteger('soluong');
         if (count < 1 || count > 100) {
@@ -269,8 +287,8 @@ client.on('interactionCreate', async interaction => {
     }
 
     if (interaction.commandName === 'mute') {
-        if (!hasRole && !isAdmin) {
-            return interaction.reply({ content: '🚫 Bạn không có quyền sử dụng lệnh này!', ephemeral: true });
+        if (!hasRole) {
+            return interaction.reply({ content: '🚫 Bạn không có Role được phép sử dụng lệnh này!', ephemeral: true });
         }
         const user = interaction.options.getMember('target');
         const minutes = interaction.options.getInteger('time');
@@ -287,9 +305,70 @@ client.on('interactionCreate', async interaction => {
         }
     }
 
+    // --- LỆNH /camchat: CHỈ DÀNH CHO ROLE QUY ĐỊNH ---
+    if (interaction.commandName === 'camchat') {
+        if (!hasRole) {
+            return interaction.reply({ content: '🚫 Bạn không có Role được phép sử dụng lệnh này!', ephemeral: true });
+        }
+
+        const targetMember = interaction.options.getMember('target');
+        const targetChannel = interaction.options.getChannel('kenh') || interaction.channel;
+        const reason = interaction.options.getString('lydo') || 'Không có lý do';
+
+        if (!targetMember) {
+            return interaction.reply({ content: '❌ Không tìm thấy người dùng này trong Server!', ephemeral: true });
+        }
+
+        try {
+            await targetChannel.permissionOverwrites.edit(targetMember, {
+                SendMessages: false
+            }, { reason });
+
+            return interaction.reply({
+                content: `🚫 Đã cấm **${targetMember.user.tag}** nhắn tin tại kênh ${targetChannel}!\n📝 **Lý do:** ${reason}`
+            });
+        } catch (error) {
+            console.error(error);
+            return interaction.reply({
+                content: '❌ Không thể cấm chat! Kiểm tra lại quyền của Bot (Bot cần quyền *Manage Channels* hoặc *Manage Roles*).',
+                ephemeral: true
+            });
+        }
+    }
+
+    // --- LỆNH /uncamchat: CHỈ DÀNH CHO ROLE QUY ĐỊNH ---
+    if (interaction.commandName === 'uncamchat') {
+        if (!hasRole) {
+            return interaction.reply({ content: '🚫 Bạn không có Role được phép sử dụng lệnh này!', ephemeral: true });
+        }
+
+        const targetMember = interaction.options.getMember('target');
+        const targetChannel = interaction.options.getChannel('kenh') || interaction.channel;
+
+        if (!targetMember) {
+            return interaction.reply({ content: '❌ Không tìm thấy người dùng này trong Server!', ephemeral: true });
+        }
+
+        try {
+            await targetChannel.permissionOverwrites.edit(targetMember, {
+                SendMessages: null
+            });
+
+            return interaction.reply({
+                content: `✅ Đã gỡ cấm nhắn tin cho **${targetMember.user.tag}** tại kênh ${targetChannel}!`
+            });
+        } catch (error) {
+            console.error(error);
+            return interaction.reply({
+                content: '❌ Không thể gỡ cấm chat! Kiểm tra lại quyền của Bot.',
+                ephemeral: true
+            });
+        }
+    }
+
     if (interaction.commandName === 'menu') {
-        if (!hasRole && !isAdmin) {
-            return interaction.reply({ content: '🚫 Bạn không có quyền hiển thị Menu này!', ephemeral: true });
+        if (!hasRole) {
+            return interaction.reply({ content: '🚫 Bạn không có Role được phép hiển thị Menu này!', ephemeral: true });
         }
 
         const embed = new EmbedBuilder()
@@ -324,7 +403,6 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({ embeds: [embed], components: [row] });
     }
 
-    // --- LỆNH /join: bot vào kênh voice của người gọi lệnh và ở lại đó ---
     if (interaction.commandName === 'join') {
         const memberVoiceChannel = interaction.member.voice.channel;
         if (!memberVoiceChannel) {
@@ -345,7 +423,6 @@ client.on('interactionCreate', async interaction => {
         }
     }
 
-    // --- LỆNH /leave: bot rời khỏi kênh voice hiện tại ---
     if (interaction.commandName === 'leave') {
         const connection = getVoiceConnection(interaction.guildId);
         if (!connection) {
