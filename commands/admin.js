@@ -1,14 +1,17 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { parseTimeToMs } = require('../utils/birthdayScheduler');
 
+// Danh sách ID Role được phép dùng (nếu muốn check theo ID)
 const allowedRoleIds = [
     '1420260959913775155', 
     '1420753551587807353', 
     '1420262154271199283'
 ];
 
-function checkRole(interaction) {
-    return interaction.member.roles.cache.some(role => allowedRoleIds.includes(role.id));
+// Hàm kiểm tra: Có quyền Administrator HOẶC có 1 trong các Role ở trên
+function isAdmin(member) {
+    if (member.permissions.has(PermissionFlagsBits.Administrator)) return true;
+    return member.roles.cache.some(role => allowedRoleIds.includes(role.id));
 }
 
 module.exports = [
@@ -16,13 +19,14 @@ module.exports = [
         data: new SlashCommandBuilder()
             .setName('clear')
             .setDescription('Xóa một số lượng tin nhắn trong kênh')
+            .setDefaultMemberPermissions(PermissionFlagsBits.Administrator) // Khóa lệnh trên giao diện Discord đối với người không phải Admin
             .addIntegerOption(option =>
                 option.setName('soluong')
                     .setDescription('Số lượng tin nhắn muốn xóa (từ 1 đến 100)')
                     .setRequired(true)),
         async execute(interaction) {
-            if (!checkRole(interaction)) {
-                return interaction.reply({ content: '🚫 Bạn không có Role được phép sử dụng lệnh này!', ephemeral: true });
+            if (!isAdmin(interaction.member)) {
+                return interaction.reply({ content: '🚫 Bạn cần có quyền Administrator hoặc Role Admin để dùng lệnh này!', ephemeral: true });
             }
             const count = interaction.options.getInteger('soluong');
             if (count < 1 || count > 100) {
@@ -40,13 +44,14 @@ module.exports = [
     {
         data: new SlashCommandBuilder()
             .setName('mute')
-            .setDescription('mute troll')
+            .setDescription('Mute người dùng trong server')
+            .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
             .addUserOption(option => option.setName('target').setDescription('Người bạn muốn mute').setRequired(true))
             .addIntegerOption(option => option.setName('time').setDescription('Thời gian mute (tính bằng phút)').setRequired(true))
             .addStringOption(option => option.setName('reason').setDescription('Lý do mute')),
         async execute(interaction) {
-            if (!checkRole(interaction)) {
-                return interaction.reply({ content: '🚫 Bạn không có Role được phép sử dụng lệnh này!', ephemeral: true });
+            if (!isAdmin(interaction.member)) {
+                return interaction.reply({ content: '🚫 Bạn cần có quyền Administrator hoặc Role Admin để dùng lệnh này!', ephemeral: true });
             }
             const user = interaction.options.getMember('target');
             const minutes = interaction.options.getInteger('time');
@@ -59,7 +64,7 @@ module.exports = [
                 await interaction.reply({ content: `✅ Đã mute **${user.user.tag}** trong **${minutes} phút**. Lý do: ${reason}` });
             } catch (error) {
                 console.error(error);
-                await interaction.reply({ content: 'Không thể mute người này do thiếu quyền!', ephemeral: true });
+                await interaction.reply({ content: 'Không thể mute người này!', ephemeral: true });
             }
         }
     },
@@ -67,13 +72,14 @@ module.exports = [
         data: new SlashCommandBuilder()
             .setName('camchat')
             .setDescription('Cấm người dùng nhắn tin trong 1 kênh cụ thể')
+            .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
             .addUserOption(option => option.setName('target').setDescription('Người muốn cấm chat').setRequired(true))
             .addStringOption(option => option.setName('thoigian').setDescription('Thời gian cấm (VD: 10p, 2h, 1d). Bỏ trống = cấm vĩnh viễn'))
             .addChannelOption(option => option.setName('kenh').setDescription('Kênh muốn cấm (để trống nếu muốn cấm ở kênh hiện tại)'))
             .addStringOption(option => option.setName('lydo').setDescription('Lý do cấm chat')),
         async execute(interaction) {
-            if (!checkRole(interaction)) {
-                return interaction.reply({ content: '🚫 Bạn không có Role được phép sử dụng lệnh này!', ephemeral: true });
+            if (!isAdmin(interaction.member)) {
+                return interaction.reply({ content: '🚫 Bạn cần có quyền Administrator hoặc Role Admin để dùng lệnh này!', ephemeral: true });
             }
 
             const targetMember = interaction.options.getMember('target');
@@ -116,11 +122,12 @@ module.exports = [
         data: new SlashCommandBuilder()
             .setName('uncamchat')
             .setDescription('Hủy cấm chat người dùng trong 1 kênh cụ thể')
+            .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
             .addUserOption(option => option.setName('target').setDescription('Người muốn gỡ cấm chat').setRequired(true))
             .addChannelOption(option => option.setName('kenh').setDescription('Kênh muốn gỡ cấm (để trống nếu là kênh hiện tại)')),
         async execute(interaction) {
-            if (!checkRole(interaction)) {
-                return interaction.reply({ content: '🚫 Bạn không có Role được phép sử dụng lệnh này!', ephemeral: true });
+            if (!isAdmin(interaction.member)) {
+                return interaction.reply({ content: '🚫 Bạn cần có quyền Administrator hoặc Role Admin để dùng lệnh này!', ephemeral: true });
             }
 
             const targetMember = interaction.options.getMember('target');
