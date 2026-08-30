@@ -1,15 +1,20 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, PermissionFlagsBits } = require('discord.js');
 
 const allowedRoleIds = ['1420260959913775155', '1420753551587807353', '1420262154271199283'];
+
+function isAdmin(member) {
+    if (member.permissions.has(PermissionFlagsBits.Administrator)) return true;
+    return member.roles.cache.some(role => allowedRoleIds.includes(role.id));
+}
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('menu')
-        .setDescription('Hiển thị bảng chọn Script Hub'),
+        .setDescription('Hiển thị bảng chọn Script Hub')
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
     async execute(interaction) {
-        const hasRole = interaction.member.roles.cache.some(role => allowedRoleIds.includes(role.id));
-        if (!hasRole) {
-            return interaction.reply({ content: '🚫 Bạn không có Role được phép hiển thị Menu này!', ephemeral: true });
+        if (!isAdmin(interaction.member)) {
+            return interaction.reply({ content: '🚫 Bạn không có quyền Admin để hiển thị Menu này!', ephemeral: true });
         }
 
         const embed = new EmbedBuilder()
