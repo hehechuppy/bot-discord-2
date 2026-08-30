@@ -1,5 +1,7 @@
 require('dotenv').config();
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
 const { 
     Client, 
     GatewayIntentBits, 
@@ -24,6 +26,27 @@ const client = new Client({
 });
 
 const afkMap = new Map();
+
+// --- BỔ SUNG: QUẢN LÝ DỮ LIỆU SINH NHẬT ---
+const BIRTHDAYS_FILE = path.join(__dirname, 'birthdays.json');
+
+function loadBirthdays() {
+    if (!fs.existsSync(BIRTHDAYS_FILE)) {
+        fs.writeFileSync(BIRTHDAYS_FILE, JSON.stringify({}), 'utf8');
+        return {};
+    }
+    try {
+        const data = fs.readFileSync(BIRTHDAYS_FILE, 'utf8');
+        return JSON.parse(data);
+    } catch (err) {
+        console.error('Lỗi khi đọc file birthdays.json:', err);
+        return {};
+    }
+}
+
+function saveBirthdays(data) {
+    fs.writeFileSync(BIRTHDAYS_FILE, JSON.stringify(data, null, 2), 'utf8');
+}
 
 // Hàm hỗ trợ chuyển đổi chuỗi thời gian (ví dụ: 10p, 2h, 1d) sang miligiây
 function parseTimeToMs(timeStr) {
@@ -106,8 +129,63 @@ const commands = [
         .setDescription('Cho bot vào kênh voice bạn đang ở và ở lại đó'),
     new SlashCommandBuilder()
         .setName('leave')
-        .setDescription('Cho bot rời khỏi kênh voice hiện tại')
+        .setDescription('Cho bot rời khỏi kênh voice hiện tại'),
+    
+    // --- BỔ SUNG: LỆNH BIRTHDAY ---
+    new SlashCommandBuilder()
+        .setName('birthday')
+        .setDescription('Quản lý thông tin sinh nhật')
+        .addSubcommand(sub =>
+            sub.setName('set')
+                .setDescription('Cài đặt ngày sinh nhật của bạn')
+                .addIntegerOption(opt => opt.setName('ngay').setDescription('Ngày sinh (1-31)').setRequired(true))
+                .addIntegerOption(opt => opt.setName('thang').setDescription('Tháng sinh (1-12)').setRequired(true)))
+        .addSubcommand(sub =>
+            sub.setName('list')
+                .setDescription('Xem danh sách sinh nhật trong server'))
+        .addSubcommand(sub =>
+            sub.setName('remove')
+                .setDescription('Xóa thông tin sinh nhật của bạn'))
 ].map(command => command.toJSON());
+
+// --- BỔ SUNG: LÊN LỊCH CHECK SINH NHẬT MỖI NGÀY ---
+function scheduleBirthdayCheck() {
+    const checkBirthdays = async () => {
+        const birthdays = loadBirthdays();
+        const today = new Date();
+        const day = today.getDate();
+        const month = today.getMonth() + 1;
+
+        for (const [userId, info] of Object.entries(birthdays)) {
+            if (info.day === day && info.month === month) {
+                // Gửi tin nhắn chúc mừng tới từng Guild có thành viên đó
+                client.guilds.cache.forEach(async (guild) => {
+                    try {
+                        const member = await guild.members.fetch(userId).catch(() => null);
+                        if (member) {
+                            // Tìm kênh văn bản đầu tiên có quyền gửi tin nhắn
+                            const systemChannel = guild.systemChannel || guild.channels.cache.find(c => c.isTextBased() && c.permissionsFor(guild.members.me).has('SendMessages'));
+                            if (systemChannel) {
+                                const embed = new EmbedBuilder()
+                                    .setColor('#FF69B4')
+                                    .setTitle('🎉 CHÚC MỪNG SINH NHẬT! 🎂')
+                                    .setDescription(`Hôm nay là sinh nhật của **${member.user.tag}** (${info.day}/${info.month})!\nChúc bạn có một ngày sinh nhật thật vui vẻ và hạnh phúc! 🎈✨`)
+                                    .setThumbnail(member.user.displayAvatarURL());
+                                systemChannel.send({ content: `🎉 <@${userId}>`, embeds: [embed] });
+                            }
+                        }
+                    } catch (err) {
+                        console.error(`Lỗi khi chúc mừng sinh nhật user ${userId}:`, err);
+                    }
+                });
+            }
+        }
+    };
+
+    // Kiểm tra ngay khi khởi chạy và mỗi 24 giờ
+    checkBirthdays();
+    setInterval(checkBirthdays, 24 * 60 * 60 * 1000);
+}
 
 client.once('ready', async () => {
     console.log(`Bot đã đăng nhập thành công dưới tên: ${client.user.tag}`);
@@ -123,6 +201,9 @@ client.once('ready', async () => {
     } catch (error) {
         console.error(error);
     }
+
+    // Bắt đầu vòng lặp kiểm tra sinh nhật
+    scheduleBirthdayCheck();
 });
 
 // 2. Sự kiện xử lý tin nhắn
@@ -283,6 +364,56 @@ client.on('interactionCreate', async interaction => {
 
     const hasRole = interaction.member.roles.cache.some(role => allowedRoleIds.includes(role.id));
 
+    // --- BỔ SUNG: XỬ LÝ LỆNH BIRTHDAY ---
+    if (interaction.commandName === 'birthday') {
+        const subcommand = interaction.options.getSubcommand();
+        const birthdays = loadBirthdays();
+
+        if (subcommand === 'set') {
+            const day = interaction.options.getInteger('ngay');
+            const month = interaction.options.getInteger('thang');
+
+            if (day < 1 || day > 31 || month < 1 || month > 12) {
+                return interaction.reply({ content: '❌ Ngày hoặc tháng không hợp lệ!', ephemeral: true });
+            }
+
+            birthdays[interaction.user.id] = { day, month };
+            saveBirthdays(birthdays);
+
+            return interaction.reply({ content: `🎂 Đã lưu ngày sinh nhật của bạn: **${day}/${month}**!`, ephemeral: true });
+        }
+
+        if (subcommand === 'list') {
+            const entries = Object.entries(birthdays);
+            if (entries.length === 0) {
+                return interaction.reply({ content: 'Chưa có ai đăng ký ngày sinh nhật!', ephemeral: true });
+            }
+
+            let listText = '';
+            for (const [userId, info] of entries) {
+                listText += `<@${userId}>: **${info.day}/${info.month}**\n`;
+            }
+
+            const embed = new EmbedBuilder()
+                .setColor('#FF69B4')
+                .setTitle('🎂 DANH SÁCH SINH NHẬT')
+                .setDescription(listText);
+
+            return interaction.reply({ embeds: [embed] });
+        }
+
+        if (subcommand === 'remove') {
+            if (!birthdays[interaction.user.id]) {
+                return interaction.reply({ content: 'Bạn chưa cài đặt sinh nhật!', ephemeral: true });
+            }
+
+            delete birthdays[interaction.user.id];
+            saveBirthdays(birthdays);
+
+            return interaction.reply({ content: '✅ Đã xóa thông tin sinh nhật của bạn!', ephemeral: true });
+        }
+    }
+
     if (interaction.commandName === 'say') {
         const noiDung = interaction.options.getString('noidung');
         await interaction.reply({ content: `Bạn vừa bắt bot nói: **${noiDung}**` });
@@ -324,7 +455,6 @@ client.on('interactionCreate', async interaction => {
         }
     }
 
-    // --- LỆNH /camchat: BỔ SUNG THỜI GIAN ---
     if (interaction.commandName === 'camchat') {
         if (!hasRole) {
             return interaction.reply({ content: '🚫 Bạn không có Role được phép sử dụng lệnh này!', ephemeral: true });
@@ -351,7 +481,6 @@ client.on('interactionCreate', async interaction => {
         }
 
         try {
-            // Cấm chat
             await targetChannel.permissionOverwrites.edit(targetMember, {
                 SendMessages: false
             }, { reason });
@@ -361,11 +490,9 @@ client.on('interactionCreate', async interaction => {
                 content: `🚫 Đã cấm **${targetMember.user.tag}** nhắn tin tại kênh ${targetChannel} ${timeDisplay}!\n📝 **Lý do:** ${reason}`
             });
 
-            // Nếu có đặt thời gian, lên lịch tự động uncamchat
             if (durationMs) {
                 setTimeout(async () => {
                     try {
-                        // Kiểm tra lại xem người dùng có còn bị cấm không trước khi gỡ
                         await targetChannel.permissionOverwrites.edit(targetMember, {
                             SendMessages: null
                         });
