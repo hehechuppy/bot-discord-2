@@ -1,5 +1,4 @@
 const { REST, Routes } = require('discord.js');
-const { scheduleBirthdayCheck } = require('../utils/birthdayScheduler');
 
 module.exports = {
     name: 'ready',
@@ -20,7 +19,5 @@ module.exports = {
         } catch (error) {
             console.error(error);
         }
-
-        scheduleBirthdayCheck(client);
     }
 };
