@@ -1,24 +1,14 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const { parseTimeToMs } = require('../utils/birthdayScheduler');
 
-// Hàm chuyển đổi thời gian (10p, 2h, 1d) sang milliseconds
-function parseTimeToMs(str) {
-    if (!str) return null;
-    const match = str.match(/^(\d+)([phd])$/i);
-    if (!match) return null;
-    const value = parseInt(match[1]);
-    const unit = match[2].toLowerCase();
-    if (unit === 'p') return value * 60 * 1000;
-    if (unit === 'h') return value * 60 * 60 * 1000;
-    if (unit === 'd') return value * 24 * 60 * 60 * 1000;
-    return null;
-}
-
+// Danh sách ID Role được phép dùng (nếu muốn check theo ID)
 const allowedRoleIds = [
     '1420260959913775155', 
     '1420753551587807353', 
     '1420262154271199283'
 ];
 
+// Hàm kiểm tra: Có quyền Administrator HOẶC có 1 trong các Role ở trên
 function isAdmin(member) {
     if (member.permissions.has(PermissionFlagsBits.Administrator)) return true;
     return member.roles.cache.some(role => allowedRoleIds.includes(role.id));
@@ -29,7 +19,7 @@ module.exports = [
         data: new SlashCommandBuilder()
             .setName('clear')
             .setDescription('Xóa một số lượng tin nhắn trong kênh')
-            .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+            .setDefaultMemberPermissions(PermissionFlagsBits.Administrator) // Khóa lệnh trên giao diện Discord đối với người không phải Admin
             .addIntegerOption(option =>
                 option.setName('soluong')
                     .setDescription('Số lượng tin nhắn muốn xóa (từ 1 đến 100)')
