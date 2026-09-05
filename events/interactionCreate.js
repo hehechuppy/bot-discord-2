@@ -14,6 +14,8 @@ const scriptHubs = {
     'Forge Hub': '🛠️ **Forge Hub**:\n```lua\nloadstring(game:HttpGet("[https://rawscripts.net/raw/Control-Blox-Fruits-OP-FREE-GUI-77953](https://rawscripts.net/raw/Control-Blox-Fruits-OP-FREE-GUI-77953)"))()\n```',
     'Terror hub': '💀 **Terror hub**:\n```lua\nloadstring(game:HttpGet("[https://rawscripts.net/raw/Universal-Script-Terror-hub-100012](https://rawscripts.net/raw/Universal-Script-Terror-hub-100012)"))()\n```',
     'Quantum Hub': '🌌 **Quantum Hub**:\n```lua\nloadstring(game:HttpGet("[https://rawscripts.net/raw/Universal-Script-Quantum-Hub-240770](https://rawscripts.net/raw/Universal-Script-Quantum-Hub-240770)"))()\n```'
+    'koko hub': '🥥 **koko hub**:\n```lua\nloadstring(game:HttpGet("https://raw.githubusercontent.com/bloxfruitsnokey/Banana/refs/heads/main/Koko/script.luau"))()\n```'
+    'realkid hub': '🧒 **realkid hub**:\n```lua\nloadstring(game:HttpGet("https://raw.githubusercontent.com/realkidhub/realkid/refs/heads/main/main.lua"))()\n```'
 };
 
 module.exports = {
