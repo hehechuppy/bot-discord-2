@@ -41,7 +41,7 @@ module.exports = {
                     { label: 'Grow A Garden 2', description: 'Lấy script Grow A Garden 2', value: 'Grow a Garden 2', emoji: '🌱' },
                     { label: 'Forge Hub', description: 'Lấy script Forge Hub', value: 'Forge Hub', emoji: '🛠️' },
                     { label: 'Terror Hub', description: 'Lấy script Terror Hub', value: 'Terror hub', emoji: '💀' },
-                    { label: 'Quantum Hub', description: 'Lấy script Quantum Hub', value: 'Quantum Hub', emoji: '🌌' }
+                    { label: 'Quantum Hub', description: 'Lấy script Quantum Hub', value: 'Quantum Hub', emoji: '🌌' },
                     { label: 'Koko Hub', description: 'Lấy script Koko Hub', value: 'koko hub', emoji: '🥥' },
                     { label: 'Realkid Hub', description: 'Lấy script Realkid Hub', value: 'realkid hub', emoji: '🧒' }
                 ])
