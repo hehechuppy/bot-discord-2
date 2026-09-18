@@ -111,5 +111,6 @@ module.exports = {
         if (contentLower === 'xin chào') message.channel.send(`Chào ${message.author.username}! Mình có thể giúp gì cho bạn?`);
         if (contentLower === 'cảm ơn') message.channel.send(`Không có gì đâu ${message.author.username}!`);
         if (contentLower === 'ê') message.reply('ê cái gì mà ê');
+        if (contentLower === 'tick' message.reply('tạo ticket ở đây <#1501567490679898244>');
     }
 };
