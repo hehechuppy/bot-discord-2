@@ -5,7 +5,7 @@ const afkMap = new Map();
 
 // ⚡ CẤU HÌNH EMOJI TỰ ĐỘNG
 const AUTO_REACTION_CHANNELS = ['1417884212249493637', '1420263046731005994'];
-const REACTIONS = ['✅', '💀', '😏', '😭', '❌', '💙', '✨', '🌙', '🎁', '🎮', '⚡', '🎉', '👉🏻', '😌', '💬', '🛞', '🥵', '🆑', '😂', '☠️', '🌚'];
+const REACTIONS = ['✅', '💀', '😏', '😭', '❌', '💙', '🌙', '🎁', '🎮', '⚡', '🎉', '👉🏻', '💬', '🛞', '🥵', '🆑', '☠️', '🌚'];
 
 module.exports = {
     name: 'messageCreate',
