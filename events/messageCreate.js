@@ -4,8 +4,8 @@ const { loadBirthdays, saveBirthdays } = require('../utils/birthdayScheduler');
 const afkMap = new Map();
 
 // ⚡ CẤU HÌNH EMOJI TỰ ĐỘNG
-const AUTO_REACTION_CHANNEL_ID = '1417884212249493637';
-const REACTIONS = ['✅', '💀', '😏', '😭', '❌', '💙', '✨', '🌙', '🎁', '🎮', '⚡', '🎉', '👉🏻', '😌', '💭', '💬', '🛞', '🥵', '🆑', '😂', '☠️', '🌚'];
+const AUTO_REACTION_CHANNEL_ID = '1417884212249493637', '1420263046731005994';
+const REACTIONS = ['✅', '💀', '😏', '😭', '❌', '💙', '✨', '🌙', '🎁', '🎮', '⚡', '🎉', '👉🏻', '😌', '💭', '💬', '🛞', '🥵', '🆑', '😂', '☠️', '🌚',];
 
 module.exports = {
     name: 'messageCreate',
