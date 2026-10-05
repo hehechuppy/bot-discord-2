@@ -4,16 +4,16 @@ const { loadBirthdays, saveBirthdays } = require('../utils/birthdayScheduler');
 const afkMap = new Map();
 
 // ⚡ CẤU HÌNH EMOJI TỰ ĐỘNG
-const AUTO_REACTION_CHANNEL_ID = ['1417884212249493637', '1420263046731005994'];
-const REACTIONS = ['✅', '💀', '😏', '😭', '❌', '💙', '✨', '🌙', '🎁', '🎮', '⚡', '🎉', '👉🏻', '😌', '💭', '💬', '🛞', '🥵', '🆑', '😂', '☠️', '🌚',];
+const AUTO_REACTION_CHANNELS = ['1417884212249493637', '1420263046731005994'];
+const REACTIONS = ['✅', '💀', '😏', '😭', '❌', '💙', '✨', '🌙', '🎁', '🎮', '⚡', '🎉', '👉🏻', '😌', '💬', '🛞', '🥵', '🆑', '😂', '☠️', '🌚'];
 
 module.exports = {
     name: 'messageCreate',
     async execute(message) {
         if (message.author.bot) return;
 
-        // 🎯 THÊM EMOJI TỰ ĐỘNG NẾU Ở KÊNH CHỈ ĐỊNH
-        if (message.channel.id === AUTO_REACTION_CHANNEL_ID) {
+        // 🎯 THÊM EMOJI TỰ ĐỘNG NẾU Ở CÁC KÊNH CHỈ ĐỊNH
+        if (AUTO_REACTION_CHANNELS.includes(message.channel.id)) {
             for (const emoji of REACTIONS) {
                 await message.react(emoji).catch(() => {});
             }
