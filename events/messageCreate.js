@@ -1,5 +1,4 @@
-const { EmbedBuilder } = require('discord.js');
-const { loadBirthdays, saveBirthdays } = require('../utils/birthdayScheduler');
+const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 
 const afkMap = new Map();
 
@@ -64,57 +63,51 @@ module.exports = {
             return message.reply(`💤 **${message.author.username}** đã bật AFK!\n📝 Lý do: **${reason}**`);
         }
 
-        // --- XỬ LÝ LỆNH SINH NHẬT DÙNG DẤU CHẤM (.) ---
-        if (contentLower.startsWith('.birthday') || contentLower.startsWith('.sinhnhat')) {
-            const args = content.split(/ +/).slice(1);
-            const sub = args[0] ? args[0].toLowerCase() : null;
-            const birthdays = loadBirthdays();
+        // --- LỆNH .lock VÀ .unlock (KHÓA TOÀN BỘ ROLE KÊNH CHAT) ---
+        if (contentLower.startsWith('.lock') || contentLower.startsWith('.unlock')) {
+            const allowedRoleIds = [
+                '1420260959913775155', 
+                '1420753551587807353', 
+                '1420262154271199283'
+            ];
 
-            // .birthday set [ngày] [tháng]
-            if (sub === 'set') {
-                const day = parseInt(args[1]);
-                const month = parseInt(args[2]);
+            const member = message.member;
+            if (!member) return;
 
-                if (!day || !month || day < 1 || day > 31 || month < 1 || month > 12) {
-                    return message.reply('❌ Cú pháp sai! Vui lòng dùng: `.birthday set [ngày] [tháng]` (Ví dụ: `.birthday set 15 8`)');
-                }
+            const hasAdmin = member.permissions.has(PermissionFlagsBits.Administrator);
+            const hasRole = member.roles.cache.some(role => allowedRoleIds.includes(role.id));
 
-                birthdays[userId] = { day, month };
-                saveBirthdays(birthdays);
-                return message.reply(`🎂 Đã lưu ngày sinh nhật của bạn: **${day}/${month}**!`);
+            if (!hasAdmin && !hasRole) {
+                return message.reply({ content: '🚫 Bạn cần có quyền Administrator hoặc Role Admin để dùng lệnh này!' });
             }
 
-            // .birthday list
-            if (sub === 'list') {
-                const entries = Object.entries(birthdays);
-                if (entries.length === 0) {
-                    return message.reply('Chưa có ai đăng ký ngày sinh nhật!');
+            const rolesToUpdate = message.guild.roles.cache.filter(role => 
+                !role.permissions.has(PermissionFlagsBits.Administrator)
+            );
+
+            if (contentLower.startsWith('.lock')) {
+                try {
+                    for (const [_, role] of rolesToUpdate) {
+                        await message.channel.permissionOverwrites.edit(role, { SendMessages: false }).catch(() => {});
+                    }
+                    return message.reply({ content: `🔒 Đã khóa thành công kênh ${message.channel} cho tất cả các Role!` });
+                } catch (error) {
+                    console.error(error);
+                    return message.reply({ content: '❌ Không thể khóa kênh này! Kiểm tra lại quyền của Bot.' });
                 }
-
-                let listText = '';
-                for (const [id, info] of entries) {
-                    listText += `<@${id}>: **${info.day}/${info.month}**\n`;
-                }
-
-                const embed = new EmbedBuilder()
-                    .setColor('#FF69B4')
-                    .setTitle('🎂 DANH SÁCH SINH NHẬT')
-                    .setDescription(listText);
-
-                return message.reply({ embeds: [embed] });
             }
 
-            // .birthday remove
-            if (sub === 'remove') {
-                if (!birthdays[userId]) {
-                    return message.reply('Bạn chưa cài đặt sinh nhật!');
+            if (contentLower.startsWith('.unlock')) {
+                try {
+                    for (const [_, role] of rolesToUpdate) {
+                        await message.channel.permissionOverwrites.edit(role, { SendMessages: null }).catch(() => {});
+                    }
+                    return message.reply({ content: `🔓 Đã mở khóa thành công kênh ${message.channel}!` });
+                } catch (error) {
+                    console.error(error);
+                    return message.reply({ content: '❌ Không thể mở khóa kênh này! Kiểm tra lại quyền của Bot.' });
                 }
-                delete birthdays[userId];
-                saveBirthdays(birthdays);
-                return message.reply('✅ Đã xóa thông tin sinh nhật của bạn!');
             }
-
-            return message.reply('❌ Lệnh không hợp lệ! Dùng: `.birthday set [ngày] [tháng]`, `.birthday list`, hoặc `.birthday remove`.');
         }
 
         // Câu thoại tự động
