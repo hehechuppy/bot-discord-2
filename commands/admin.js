@@ -1,14 +1,14 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { parseTimeToMs } = require('../utils/birthdayScheduler');
 
-// Danh sách ID Role được phép dùng
+// Danh sách ID Role được phép dùng (nếu muốn check theo ID)
 const allowedRoleIds = [
     '1420260959913775155', 
     '1420753551587807353', 
     '1420262154271199283'
 ];
 
-// Hàm kiểm tra quyền
+// Hàm kiểm tra: Có quyền Administrator HOẶC có 1 trong các Role ở trên
 function isAdmin(member) {
     if (member.permissions.has(PermissionFlagsBits.Administrator)) return true;
     return member.roles.cache.some(role => allowedRoleIds.includes(role.id));
@@ -19,7 +19,7 @@ module.exports = [
         data: new SlashCommandBuilder()
             .setName('clear')
             .setDescription('Xóa một số lượng tin nhắn trong kênh')
-            .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+            .setDefaultMemberPermissions(PermissionFlagsBits.Administrator) // Khóa lệnh trên giao diện Discord đối với người không phải Admin
             .addIntegerOption(option =>
                 option.setName('soluong')
                     .setDescription('Số lượng tin nhắn muốn xóa (từ 1 đến 100)')
@@ -141,62 +141,6 @@ module.exports = [
             } catch (error) {
                 console.error(error);
                 return interaction.reply({ content: '❌ Không thể gỡ cấm chat!', ephemeral: true });
-            }
-        }
-    },
-    {
-        data: new SlashCommandBuilder()
-            .setName('lock')
-            .setDescription('Khóa kênh chat hiện tại (hoặc kênh được chọn)')
-            .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-            .addChannelOption(option => 
-                option.setName('kenh')
-                    .setDescription('Kênh muốn khóa (để trống nếu muốn khóa kênh hiện tại)')
-            ),
-        async execute(interaction) {
-            if (!isAdmin(interaction.member)) {
-                return interaction.reply({ content: '🚫 Bạn cần có quyền Administrator hoặc Role Admin để dùng lệnh này!', ephemeral: true });
-            }
-
-            const targetChannel = interaction.options.getChannel('kenh') || interaction.channel;
-
-            try {
-                await targetChannel.permissionOverwrites.edit(interaction.guild.roles.everyone, {
-                    SendMessages: false
-                });
-
-                await interaction.reply({ content: `🔒 Đã khóa thành công kênh ${targetChannel}!` });
-            } catch (error) {
-                console.error(error);
-                await interaction.reply({ content: '❌ Không thể khóa kênh này! Hãy kiểm tra lại quyền của Bot.', ephemeral: true });
-            }
-        }
-    },
-    {
-        data: new SlashCommandBuilder()
-            .setName('unlock')
-            .setDescription('Mở khóa kênh chat hiện tại (hoặc kênh được chọn)')
-            .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-            .addChannelOption(option => 
-                option.setName('kenh')
-                    .setDescription('Kênh muốn mở khóa (để trống nếu muốn mở khóa kênh hiện tại)')
-            ),
-        async execute(interaction) {
-            if (!isAdmin(interaction.member)) {
-                return interaction.reply({ content: '🚫 Bạn cần có quyền Administrator hoặc Role Admin để dùng lệnh này!', ephemeral: true });
-            }
-
-            const targetChannel = interaction.options.getChannel('kenh') || interaction.channel;
-
-            try {
-                await targetChannel.permissionOverwrites.edit(interaction.guild.roles.everyone, {
-                    SendMessages: null
-                });
-
-                await interaction.reply({ content: `🔓 Đã mở khóa thành công kênh ${targetChannel}!` });
-            } catch (error) {
-                console.error(error);
-                await interaction.reply({ content: '❌ Không thể mở khóa kênh này! Hãy kiểm tra lại quyền của Bot.', ephemeral: true });
             }
         }
     }
