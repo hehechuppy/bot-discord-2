@@ -19,7 +19,7 @@ module.exports = [
         data: new SlashCommandBuilder()
             .setName('clear')
             .setDescription('Xóa một số lượng tin nhắn trong kênh')
-            .setDefaultMemberPermissions(PermissionFlagsBits.Administrator) // Khóa lệnh trên giao diện Discord đối với người không phải Admin
+            .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
             .addIntegerOption(option =>
                 option.setName('soluong')
                     .setDescription('Số lượng tin nhắn muốn xóa (từ 1 đến 100)')
@@ -118,30 +118,3 @@ module.exports = [
             }
         }
     },
-    {
-        data: new SlashCommandBuilder()
-            .setName('uncamchat')
-            .setDescription('Hủy cấm chat người dùng trong 1 kênh cụ thể')
-            .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-            .addUserOption(option => option.setName('target').setDescription('Người muốn gỡ cấm chat').setRequired(true))
-            .addChannelOption(option => option.setName('kenh').setDescription('Kênh muốn gỡ cấm (để trống nếu là kênh hiện tại)')),
-        async execute(interaction) {
-            if (!isAdmin(interaction.member)) {
-                return interaction.reply({ content: '🚫 Bạn cần có quyền Administrator hoặc Role Admin để dùng lệnh này!', ephemeral: true });
-            }
-
-            const targetMember = interaction.options.getMember('target');
-            const targetChannel = interaction.options.getChannel('kenh') || interaction.channel;
-
-            if (!targetMember) return interaction.reply({ content: '❌ Không tìm thấy người dùng!', ephemeral: true });
-
-            try {
-                await targetChannel.permissionOverwrites.edit(targetMember, { SendMessages: null });
-                return interaction.reply({ content: `✅ Đã gỡ cấm nhắn tin cho **${targetMember.user.tag}** tại kênh ${targetChannel}!` });
-            } catch (error) {
-                console.error(error);
-                return interaction.reply({ content: '❌ Không thể gỡ cấm chat!', ephemeral: true });
-            }
-        }
-    }
-];
