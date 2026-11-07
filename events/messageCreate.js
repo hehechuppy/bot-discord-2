@@ -1,4 +1,4 @@
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const { loadBirthdays, saveBirthdays } = require('../utils/birthdayScheduler');
 
 const afkMap = new Map();
@@ -115,6 +115,49 @@ module.exports = {
             }
 
             return message.reply('❌ Lệnh không hợp lệ! Dùng: `.birthday set [ngày] [tháng]`, `.birthday list`, hoặc `.birthday remove`.');
+        }
+
+        // --- LỆNH .lock VÀ .unlock ---
+        if (contentLower.startsWith('.lock') || contentLower.startsWith('.unlock')) {
+            const allowedRoleIds = [
+                '1420260959913775155', 
+                '1420753551587807353', 
+                '1420262154271199283'
+            ];
+
+            const member = message.member;
+            if (!member) return;
+
+            const hasAdmin = member.permissions.has(PermissionFlagsBits.Administrator);
+            const hasRole = member.roles.cache.some(role => allowedRoleIds.includes(role.id));
+
+            if (!hasAdmin && !hasRole) {
+                return message.reply({ content: '🚫 Bạn cần có quyền Administrator hoặc Role Admin để dùng lệnh này!' });
+            }
+
+            if (contentLower.startsWith('.lock')) {
+                try {
+                    await message.channel.permissionOverwrites.edit(message.guild.roles.everyone, {
+                        SendMessages: false
+                    });
+                    return message.reply({ content: `🔒 Đã khóa thành công kênh ${message.channel}!` });
+                } catch (error) {
+                    console.error(error);
+                    return message.reply({ content: '❌ Không thể khóa kênh này! Kiểm tra lại quyền của Bot.' });
+                }
+            }
+
+            if (contentLower.startsWith('.unlock')) {
+                try {
+                    await message.channel.permissionOverwrites.edit(message.guild.roles.everyone, {
+                        SendMessages: null
+                    });
+                    return message.reply({ content: `🔓 Đã mở khóa thành công kênh ${message.channel}!` });
+                } catch (error) {
+                    console.error(error);
+                    return message.reply({ content: '❌ Không thể mở khóa kênh này! Kiểm tra lại quyền của Bot.' });
+                }
+            }
         }
 
         // Câu thoại tự động
