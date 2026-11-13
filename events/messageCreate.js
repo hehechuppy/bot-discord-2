@@ -3,7 +3,7 @@ const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const afkMap = new Map();
 
 // ⚡ CẤU HÌNH EMOJI TỰ ĐỘNG
-const AUTO_REACTION_CHANNELS = ['1420263046731005994', '1512366354496225410'];
+const AUTO_REACTION_CHANNELS = ['1512366354496225410'];
 const REACTIONS = ['✅', '💀', '😏', '😭', '❌', '💙', '🌙', '🎁', '🎮', '⚡', '🎉', '👉🏻', '💬', '🛞', '🥵', '🆑', '☠️', '🌚'];
 
 module.exports = {
